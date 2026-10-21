@@ -366,7 +366,7 @@ export default function App() {
               {extraBloodUnits > 0 && <div className="aar-row"><span>Potential additional supply</span><strong>{extraBloodUnits} modeled units</strong></div>}
             </div>
             <label className="check-row"><input type="checkbox" checked={coldChainVerified} onChange={(e) => setColdChainVerified(e.target.checked)} disabled={timerStarted || decisionLocked} /><span><strong>Cold-chain integrity verified</strong><small>Scenario toggle; unverified status blocks counting a modeled delivery as received.</small></span></label>
-            <p className="disclaimer">Synthetic training model only. Injury-to-transfusion timing is an illustrative scenario clock (one decision-window second = one simulated minute), not measured clinical performance. Patient records describe modeled resource status, not diagnosis, triage, survival, or clinical outcome. The 36-minute reference and <30-minute target are user-provided evaluation benchmarks, not validated by this prototype.</p>
+            <p className="disclaimer">Synthetic training model only. Injury-to-transfusion timing is an illustrative scenario clock (one decision-window second = one simulated minute), not measured clinical performance. Patient records describe modeled resource status, not diagnosis, triage, survival, or clinical outcome. The 36-minute reference and &lt;30-minute target are user-provided evaluation benchmarks, not validated by this prototype.</p>
           </section>
 
           <section className="results-column">
