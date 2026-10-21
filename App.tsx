@@ -31,23 +31,186 @@ const initialInventory = {
   plasmaUnits: 18,
   plateletsUnits: 12,
 };
+function estimate(
 
-function estimate(scenario: Scenario, coa: CoaId, allocation: Allocation, inventory: typeof initialInventory) {
-  // Illustrative model only. Assumptions are intentionally simple and configurable.
-  const demandFactor = scenario.id === 1 ? 1 : scenario.id === 2 ? 1.8 : 2.7;
+  scenario: Scenario,
+
+  coa: CoaId,
+
+  allocation: Allocation,
+
+  inventory: typeof initialInventory
+
+) {
+
+  // Illustrative training model only; not validated clinical or operational data.
+
+  const demandFactor =
+
+    scenario.id === 1 ? 1 :
+
+    scenario.id === 2 ? 1.8 : 2.7;
+
   const unitsDemanded = Math.ceil(scenario.casualties * demandFactor);
-  const disruptionPenalty = scenario.disruption * 12;
-  const coldChainRisk = Math.min(95, 5 + scenario.disruption * 28 + (allocation === "blood" ? 0 : 10));
+
+  const availableUnits =
+
+    inventory.wholeBloodUnits +
+
+    inventory.redCellUnits +
+
+    inventory.plasmaUnits +
+
+    inventory.plateletsUnits;
+
+  // Illustrative transport capacity, expressed as a percentage index.
+
+  const disruptionPenalty = scenario.disruption * 20;
+
   const transportCapacity = Math.max(0, 100 - disruptionPenalty);
-  const allocatedBloodCapacity = allocation === "blood" ? 65 : allocation === "evacuation" ? 35 : 20;
-  const supportBonus = coa === "baseline" ? 0 : coa === "decision_support" ? 8 : 14;
-  const availableUnits = inventory.wholeBloodUnits + inventory.redCellUnits + inventory.plasmaUnits + inventory.plateletsUnits;
-  const effectiveDelivery = Math.min(availableUnits, Math.max(0, Math.floor((allocatedBloodCapacity + supportBonus) * transportCapacity / 100 / 10)));
+
+  // Illustrative maximum units transportable before disruption.
+
+  const baseDeliveryCapacity =
+
+    allocation === "blood" ? 12 :
+
+    allocation === "evacuation" ? 7 : 4;
+
+  // COA effects are explicit model assumptions, not proven advantages.
+
+  const coaCapacityAdjustment =
+
+    coa === "baseline" ? 0 :
+
+    coa === "decision_support" ? 2 : 3;
+
+  const coldChainRisk = Math.min(
+
+    95,
+
+    5 + scenario.disruption * 28 + (allocation === "blood" ? 0 : 10)
+
+  );
+
+  const deliveryCapacity = Math.max(
+
+    0,
+
+    Math.floor(
+
+      (baseDeliveryCapacity + coaCapacityAdjustment) *
+
+      transportCapacity / 100
+
+    )
+
+  );
+
+  const effectiveDelivery = Math.min(
+
+    availableUnits,
+
+    unitsDemanded,
+
+    deliveryCapacity
+
+  );
+
   const unmet = Math.max(0, unitsDemanded - effectiveDelivery);
-  const support = Math.max(0, Math.min(100, Math.round(100 - (unmet / Math.max(1, unitsDemanded)) * 100)));
-  const mission = Math.max(0, Math.min(100, Math.round(55 + transportCapacity * 0.25 + supportBonus - (unmet * 4) - (allocation === "reposition" ? 12 : allocation === "evacuation" ? 5 : 0))));
-  const forceRisk = Math.max(0, Math.min(100, Math.round(100 - (mission * 0.45 + support * 0.35) + coldChainRisk * 0.35)));
-  return { unitsDemanded, availableUnits, effectiveDelivery, unmet, support, mission, forceRisk, coldChainRisk, transportCapacity };
+
+  const support = Math.max(
+
+    0,
+
+    Math.min(
+
+      100,
+
+      Math.round(
+
+        (effectiveDelivery / Math.max(1, unitsDemanded)) * 100
+
+      )
+
+    )
+
+  );
+
+  const mission = Math.max(
+
+    0,
+
+    Math.min(
+
+      100,
+
+      Math.round(
+
+        50 +
+
+        transportCapacity * 0.2 +
+
+        coaCapacityAdjustment * 2 -
+
+        unmet * 3 -
+
+        (allocation === "reposition" ? 12 :
+
+         allocation === "evacuation" ? 5 : 0)
+
+      )
+
+    )
+
+  );
+
+  const forceRisk = Math.max(
+
+    0,
+
+    Math.min(
+
+      100,
+
+      Math.round(
+
+        100 -
+
+        (mission * 0.4 + support * 0.4) +
+
+        coldChainRisk * 0.2
+
+      )
+
+    )
+
+  );
+
+  return {
+
+    unitsDemanded,
+
+    availableUnits,
+
+    deliveryCapacity,
+
+    effectiveDelivery,
+
+    unmet,
+
+    support,
+
+    mission,
+
+    forceRisk,
+
+    coldChainRisk,
+
+    transportCapacity
+
+  };
+
 }
 
 export default function App() {
