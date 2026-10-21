@@ -329,7 +329,50 @@ export default function App() {
               {!hasRun && <div className="empty-state">Configure the scenario and select <strong>Run simulation</strong> to calculate illustrative outcomes.</div>}
               {hasRun && <div className="result-note"><strong>Interpretation:</strong> These scores are outputs of the prototype's simple rules, not validated estimates of real-world performance. Compare COAs under the same scenario and inventory assumptions.</div>}
             </div>
-
+<div className="panel delivery-breakdown">
+  <div className="section-head">
+    <span className="step">05</span>
+    <h2>Blood delivery breakdown</h2>
+  </div>
+  <div className="metric-grid">
+    <Metric
+      label="Blood at source"
+      value={result.availableUnits.toString()}
+      unit="AVAILABLE UNITS"
+    />
+    <Metric
+      label="Transport limit"
+      value={result.deliveryCapacity.toString()}
+      unit="MODEL CAPACITY"
+    />
+    <Metric
+      label="Blood delivered"
+      value={hasRun ? result.effectiveDelivery.toString() : "—"}
+      unit="DELIVERED UNITS"
+    />
+    <Metric
+      label="Demand remaining"
+      value={hasRun ? result.unmet.toString() : "—"}
+      unit="UNMET MODELED UNITS"
+      risk
+    />
+  </div>
+  {hasRun && (
+    <div className="result-note">
+      <strong>Constraint diagnosis:</strong>{" "}
+      {result.availableUnits < result.unitsDemanded &&
+      result.availableUnits <= result.deliveryCapacity
+        ? "Inventory is the primary modeled constraint."
+        : result.deliveryCapacity < result.unitsDemanded &&
+          result.deliveryCapacity < result.availableUnits
+        ? "Transportation capacity is the primary modeled constraint."
+        : result.unmet === 0
+        ? "All modeled demand was met under the current assumptions."
+        : "Multiple constraints may contribute to unmet modeled demand."}
+      {" "}These are illustrative model findings, not validated operational predictions.
+    </div>
+  )}
+</div>
             <div className="panel aar">
               <div className="section-head"><span className="step">05</span><h2>After-action review</h2></div>
               {hasRun ? (
