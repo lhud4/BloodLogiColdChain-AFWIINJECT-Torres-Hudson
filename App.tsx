@@ -130,6 +130,39 @@ export default function App() {
   const pendingEvacCount = patients.filter((p) => p.evacuationRequired && p.evacuationStatus !== "Evacuated").length;
   const roundRecords = records.filter((r) => r.round === scenarioId);
 
+  // Transparent, rule-based decision support for this synthetic training prototype.
+  // This is not a connected generative-AI model or a validated clinical decision system.
+  const aiSupport = useMemo(() => {
+    let priority = "Review the current resource picture and select the action that best addresses the largest unmet requirement.";
+    let rationale = "Recommendations are generated from the current synthetic scenario state.";
+    if (!coldChainVerified && unmetBloodCount > 0) {
+      priority = "Verify cold-chain integrity before counting any blood delivery as received.";
+      rationale = "The cold-chain check is currently unverified, so modeled blood delivery will not be counted.";
+    } else if (unmetBloodCount > 0 && totalBlood <= 0) {
+      priority = "Assess a modeled resupply option; the available blood pool is depleted.";
+      rationale = "Blood-required casualty records remain unresolved and the displayed inventory pool is empty.";
+    } else if (unmetBloodCount > 0 && scenario.disruption > 0) {
+      priority = "Consider prioritizing blood transport for casualties with unmet blood requirements.";
+      rationale = `${unmetBloodCount} blood requirement(s) remain pending while the scenario includes logistics disruption.`;
+    } else if (pendingEvacCount > 0) {
+      priority = "Review evacuation demand against the remaining modeled transport capacity.";
+      rationale = `${pendingEvacCount} evacuation requirement(s) remain pending.`;
+    } else if (unmetBloodCount === 0 && pendingEvacCount === 0) {
+      priority = "All modeled blood and evacuation requirements are currently met.";
+      rationale = "Continue monitoring for new injects and confirm the state after each decision cycle.";
+    }
+    const projectedTime = patients
+      .filter((p) => p.bloodRequired && p.transfusionMinute !== null)
+      .map((p) => p.transfusionMinute as number);
+    const meanTime = projectedTime.length
+      ? `${(projectedTime.reduce((sum, value) => sum + value, 0) / projectedTime.length).toFixed(1)} min observed in model`
+      : "Not yet available";
+    const coaMode = coa === "decision_support"
+      ? "COA 2 mode: surface constraints and a rule-based recommendation; commander retains decision authority."
+      : "COA 3 mode: prioritize the recommendation and include cold-chain verification as an explicit decision gate.";
+    return { priority, rationale, meanTime, coaMode };
+  }, [coldChainVerified, unmetBloodCount, totalBlood, scenario.disruption, pendingEvacCount, patients, coa]);
+
   useEffect(() => {
     if (!timerStarted || deadline === null || decisionLocked || timedOut) return;
     const timer = window.setInterval(() => setNow(Date.now()), 200);
@@ -383,6 +416,19 @@ export default function App() {
               <div className="result-note"><strong>Latest situation report:</strong> {lastEvent}</div>
               <div className="result-note"><strong>Last action result:</strong> {lastResult}</div>
             </div>
+
+            {coa !== "baseline" && <div className="panel ai-support" style={{ border: "1px solid #4f91a8", background: "linear-gradient(135deg, rgba(18,52,68,.96), rgba(18,34,48,.98))", color: "#eef8fb", padding: "1.25rem", borderRadius: "14px", marginBottom: "1rem" }}>
+              <div className="section-head"><span className="step">AI</span><h2>AI Decision Support</h2><span className="live-tag">{coa === "decision_support" ? "COA 2" : "COA 3"}</span></div>
+              <p style={{ color: "#b8dce7", marginTop: 0 }}>{aiSupport.coaMode}</p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: ".8rem", margin: "1rem 0" }}>
+                <div className="metric"><span style={{ color: "#b8dce7" }}>Recommended priority</span><strong style={{ color: "#fff", fontSize: "1rem", lineHeight: 1.4 }}>{aiSupport.priority}</strong></div>
+                <div className="metric"><span style={{ color: "#b8dce7" }}>Blood requirements pending</span><strong style={{ color: unmetBloodCount > 0 ? "#ffcf8b" : "#a7e6bd" }}>{unmetBloodCount}</strong><small style={{ color: "#b8dce7" }}>of {bloodRequiredCount} blood-required casualty records</small></div>
+                <div className="metric"><span style={{ color: "#b8dce7" }}>Evacuation requirements pending</span><strong style={{ color: pendingEvacCount > 0 ? "#ffcf8b" : "#a7e6bd" }}>{pendingEvacCount}</strong><small style={{ color: "#b8dce7" }}>modeled requirements</small></div>
+                <div className="metric"><span style={{ color: "#b8dce7" }}>Injury-to-transfusion time</span><strong style={{ color: "#fff" }}>{aiSupport.meanTime}</strong><small style={{ color: "#b8dce7" }}>Target: under 30 min · reference: 36 min</small></div>
+              </div>
+              <div className="result-note" style={{ background: "rgba(255,255,255,.07)", color: "#eef8fb" }}><strong>Why this is recommended:</strong> {aiSupport.rationale}</div>
+              <p className="hint" style={{ color: "#b8dce7", marginBottom: 0 }}>This is transparent, rule-based decision support using synthetic scenario data—not a live AI model, validated clinical guidance, or a real-world time prediction. The commander makes the final choice.</p>
+            </div>}
 
             <div className="panel casualty-board">
               <div className="section-head"><span className="step">05</span><h2>Casualty tracking board</h2><span className="live-tag">{patients.length} TRACKED</span></div>
