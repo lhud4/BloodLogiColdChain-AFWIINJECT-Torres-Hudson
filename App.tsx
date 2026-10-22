@@ -117,6 +117,7 @@ export default function App() {
   const [lastEvent, setLastEvent] = useState("Initial situation report: establish priorities and identify constraints.");
   const [lastResult, setLastResult] = useState("No decision resolved yet.");
   const [scenarioEnded, setScenarioEnded] = useState(false);
+  const [showAiRecommendation, setShowAiRecommendation] = useState(false);
 
   const scenario = scenarios.find((item) => item.id === scenarioId)!;
   const remainingSeconds = deadline === null ? scenario.timeLimit : Math.max(0, Math.ceil((deadline - now) / 1000));
@@ -201,6 +202,7 @@ export default function App() {
     setLastEvent("Initial situation report: establish priorities and identify constraints.");
     setLastResult("No decision resolved yet.");
     setScenarioEnded(false);
+    setShowAiRecommendation(false);
     setRecords((current) => current.filter((record) => record.round !== nextScenarioId));
   }
 
@@ -322,6 +324,7 @@ export default function App() {
       secondsToDecide, event: lastEvent, result: resultText, affectedPatients: affected,
     }]);
     setResolved(true);
+    if (coa === "recommended") setShowAiRecommendation(true);
     setTimerStarted(false);
     setDeadline(null);
     setSelectedDecision("");
@@ -392,7 +395,8 @@ export default function App() {
             {timedOut && <div className="result-note risk"><strong>Time expired.</strong> No action was applied. Reset the round to try again.</div>}
             {decisionLocked && !resolved && !timedOut && <div className="result-note"><strong>Decision committed.</strong> Select “Resolve action / advance scenario” to apply the modeled action and reveal its consequences.</div>}
             <div className="section-head spaced"><span className="step">03</span><h2>Course of action</h2></div>
-            <div className="field"><label htmlFor="coa">COA comparison</label><select id="coa" value={coa} onChange={(e) => setCoa(e.target.value as CoaId)}>{Object.entries(coaDetails).map(([id, item]) => <option key={id} value={id}>{item.name}</option>)}</select><p className="hint">{coaDetails[coa].description}</p></div>
+            <div className="field"><label htmlFor="coa">COA comparison</label><select id="coa" value={coa} onChange={(e) => { const nextCoa = e.target.value as CoaId; setCoa(nextCoa); setShowAiRecommendation(nextCoa === "recommended"); }}>{Object.entries(coaDetails).map(([id, item]) => <option key={id} value={id}>{item.name}</option>)}</select><p className="hint">{coaDetails[coa].description}</p></div>
+            {coa === "recommended" && <button type="button" className="secondary-button" onClick={() => setShowAiRecommendation(true)} style={{ width: "100%", marginBottom: "1rem" }}>View COA 3 AI recommendation</button>}
             <div className="field inventory-field">
               <div className="field-title">Available inventory <span>ILLUSTRATIVE UNITS</span></div>
               {(Object.keys(inventory) as (keyof typeof initialInventory)[]).map((key) => <label className="inventory-row" key={key}><span>{key === "wholeBlood" ? "Whole blood" : key === "redCells" ? "Red cells" : key === "plasma" ? "Plasma" : "Platelets"}</span><input type="number" min="0" max="999" value={inventory[key]} onChange={(e) => setInventory((current) => ({ ...current, [key]: Math.max(0, Math.min(999, Number(e.target.value))) }))} disabled={timerStarted || decisionLocked} /></label>)}
@@ -416,19 +420,6 @@ export default function App() {
               <div className="result-note"><strong>Latest situation report:</strong> {lastEvent}</div>
               <div className="result-note"><strong>Last action result:</strong> {lastResult}</div>
             </div>
-
-            {coa !== "baseline" && <div className="panel ai-support" style={{ border: "1px solid #4f91a8", background: "linear-gradient(135deg, rgba(18,52,68,.96), rgba(18,34,48,.98))", color: "#eef8fb", padding: "1.25rem", borderRadius: "14px", marginBottom: "1rem" }}>
-              <div className="section-head"><span className="step">AI</span><h2>AI Decision Support</h2><span className="live-tag">{coa === "decision_support" ? "COA 2" : "COA 3"}</span></div>
-              <p style={{ color: "#b8dce7", marginTop: 0 }}>{aiSupport.coaMode}</p>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: ".8rem", margin: "1rem 0" }}>
-                <div className="metric"><span style={{ color: "#b8dce7" }}>Recommended priority</span><strong style={{ color: "#fff", fontSize: "1rem", lineHeight: 1.4 }}>{aiSupport.priority}</strong></div>
-                <div className="metric"><span style={{ color: "#b8dce7" }}>Blood requirements pending</span><strong style={{ color: unmetBloodCount > 0 ? "#ffcf8b" : "#a7e6bd" }}>{unmetBloodCount}</strong><small style={{ color: "#b8dce7" }}>of {bloodRequiredCount} blood-required casualty records</small></div>
-                <div className="metric"><span style={{ color: "#b8dce7" }}>Evacuation requirements pending</span><strong style={{ color: pendingEvacCount > 0 ? "#ffcf8b" : "#a7e6bd" }}>{pendingEvacCount}</strong><small style={{ color: "#b8dce7" }}>modeled requirements</small></div>
-                <div className="metric"><span style={{ color: "#b8dce7" }}>Injury-to-transfusion time</span><strong style={{ color: "#fff" }}>{aiSupport.meanTime}</strong><small style={{ color: "#b8dce7" }}>Target: under 30 min · reference: 36 min</small></div>
-              </div>
-              <div className="result-note" style={{ background: "rgba(255,255,255,.07)", color: "#eef8fb" }}><strong>Why this is recommended:</strong> {aiSupport.rationale}</div>
-              <p className="hint" style={{ color: "#b8dce7", marginBottom: 0 }}>This is transparent, rule-based decision support using synthetic scenario data—not a live AI model, validated clinical guidance, or a real-world time prediction. The commander makes the final choice.</p>
-            </div>}
 
             <div className="panel casualty-board">
               <div className="section-head"><span className="step">05</span><h2>Casualty tracking board</h2><span className="live-tag">{patients.length} TRACKED</span></div>
@@ -465,6 +456,29 @@ export default function App() {
           </section>
         </div>
       </main>
+      {showAiRecommendation && coa === "recommended" && <div role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowAiRecommendation(false); }} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(2, 8, 14, .82)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem", backdropFilter: "blur(5px)" }}>
+        <section role="dialog" aria-modal="true" aria-labelledby="coa3-recommendation-title" className="panel" style={{ width: "min(760px, 100%)", maxHeight: "90vh", overflowY: "auto", border: "1px solid #65b6cf", boxShadow: "0 24px 80px rgba(0,0,0,.5)", background: "linear-gradient(145deg, #102b3b, #091923)", color: "#eef8fb", padding: "clamp(1rem, 3vw, 1.6rem)", borderRadius: "16px" }}>
+          <div className="section-head"><span className="step">AI</span><h2 id="coa3-recommendation-title" style={{ color: "#fff" }}>COA 3 · AI recommendation</h2><span className="live-tag">UPDATED</span></div>
+          <p style={{ color: "#b8dce7", marginTop: 0 }}>Recommendation compiled from the current scenario state and the actions already applied. Commander retains decision authority.</p>
+          <div style={{ border: "1px solid rgba(101,182,207,.5)", borderRadius: "12px", padding: "1rem", background: "rgba(255,255,255,.045)", margin: "1rem 0" }}>
+            <div className="eyebrow">RECOMMENDED PRIORITY</div><h3 style={{ color: "#fff", margin: ".4rem 0 .65rem", lineHeight: 1.35 }}>{aiSupport.priority}</h3>
+            <p style={{ color: "#d7eaf0", marginBottom: 0 }}><strong>Why:</strong> {aiSupport.rationale}</p>
+          </div>
+          <div className="metric-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(145px, 1fr))", marginBottom: "1rem" }}>
+            <Metric label="Casualties tracked" value={String(patients.length)} unit="INDIVIDUAL RECORDS" />
+            <Metric label="Blood requirements pending" value={String(unmetBloodCount)} unit={`OF ${bloodRequiredCount} REQUIRED`} risk={unmetBloodCount > 0} />
+            <Metric label="Evacuation requirements pending" value={String(pendingEvacCount)} unit="MODELED REQUIREMENTS" risk={pendingEvacCount > 0} />
+            <Metric label="Available blood pool" value={String(totalBlood)} unit="ILLUSTRATIVE UNITS" risk={totalBlood <= 0} />
+            <Metric label="Communications" value={communicationsReady ? "Available" : "Degraded"} unit="MODEL STATE" risk={!communicationsReady} />
+            <Metric label="Observed modeled transfusion time" value={aiSupport.meanTime} unit="TARGET <30 MIN · REFERENCE 36 MIN" />
+          </div>
+          <div className="result-note" style={{ background: "rgba(255,255,255,.06)", color: "#eef8fb", marginBottom: "1rem" }}><strong>Operational constraints:</strong> Cold-chain integrity is {coldChainVerified ? "currently marked verified" : "NOT verified — modeled blood delivery is blocked"}; scenario disruption level is {scenario.disruption}; {pendingEvacCount} evacuation requirement(s) remain pending.</div>
+          <h3 style={{ color: "#fff", marginBottom: ".5rem" }}>Actions already applied this round</h3>
+          {roundRecords.filter((record) => record.decision !== "timeout").length === 0 ? <p style={{ color: "#b8dce7" }}>No actions have been resolved yet. This is the initial recommendation for the current operational picture.</p> : <div style={{ display: "grid", gap: ".55rem", marginBottom: "1rem" }}>{roundRecords.filter((record) => record.decision !== "timeout").slice(-4).reverse().map((record, index) => <div key={`${record.turn}-${index}`} style={{ borderLeft: "3px solid #65b6cf", padding: ".55rem .75rem", background: "rgba(255,255,255,.04)" }}><strong style={{ color: "#fff" }}>Turn {record.turn}: {record.decisionLabel}</strong><p style={{ margin: ".25rem 0", color: "#d7eaf0" }}>{record.result}</p><small style={{ color: "#b8dce7" }}>T+{record.elapsedAtDecision} min · {record.affectedPatients} record(s) changed</small></div>)}</div>}
+          <p className="hint" style={{ color: "#b8dce7" }}>This prototype uses transparent, rule-based logic and synthetic data. It is not a live AI model, clinical guidance, or a validated real-world time prediction. Verify product suitability and clinical decisions through approved procedures.</p>
+          <div className="button-row" style={{ justifyContent: "flex-end" }}><button type="button" className="primary-button" onClick={() => setShowAiRecommendation(false)}>Continue simulation <span>↗</span></button></div>
+        </section>
+      </div>}
       <footer>AFWIP CONCEPT PROTOTYPE <span>·</span> BLOOD LOGISTICS COLD CHAIN <span>·</span> SYNTHETIC DATA ONLY</footer>
     </div>
   );
